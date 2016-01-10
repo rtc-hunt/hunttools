@@ -1,4 +1,4 @@
-module Crossword (buildDict, stringToQuery, doCrossword, QueryPart (Literal, Glob, Dot ) )
+module Crossword (buildDict, stringToQuery, stringToStraightQuery, doCrossword, doCrosswordStraight, QueryPart (Literal, Glob, Dot ), CrosswordDictionary, buildDictAscSplit )
 where
 
 import Data.DAWG.Packed
@@ -6,13 +6,22 @@ import Data.List.Split
 import Data.List
 import Data.Maybe
 import Data.Ord
+import MergeDawg
 
 data QueryPart = Literal String | Glob | Dot | Charset [Char] deriving (Show)
+type CrosswordDictionary = Node
 
-rootedWords w = zipWith ((++) . (++"|")) (tails w) $ map reverse $ inits w
+rootedWords :: String -> [String]
+rootedWords w = let res = zipWith ((++) . (++"|")) (tails w) $ map reverse $ inits w in (foldl' (const id) "" res ::String) `seq` res
 
 buildDict :: [String] -> Node
-buildDict wordList = fromList $ concatMap rootedWords wordList
+buildDict wordList = fromList $ let res=concatMap rootedWords wordList in foldl' (const id) "" res `seq` res
+
+buildDictAscSplit wordList = buildHugeDAWG $ wordList
+--	do wd <- wordList
+--	   id $! rootedWords wd
+
+--concatMap rootedWords wordList
 
 doQuery dict [] aPrefix = if member "" dict then [aPrefix] else []
 doQuery dict (Literal qPrefix:rest) aPrefix =
@@ -49,12 +58,15 @@ tokenToQueryPart '?' = Dot
 tokenToQueryPart '*' = Glob
 tokenToQueryPart a = Literal [a]
 
-stringToQuery word = optimizeInitialLiteral $ reverse $ 
-		foldl coalesceLiterals [] $ 
-			map tokenToQueryPart $ word ++ "|"
+stringToQuery word = optimizeInitialLiteral $ stringToStraightQuery word
+
+stringToStraightQuery word = reverse $
+	foldl coalesceLiterals [] $
+		map tokenToQueryPart $ word ++ "|"
 
 unoptimizeResult r = let idx = fromJust $ elemIndex '|' r in (reverse $ drop (idx+1) r) ++ (take idx r)
 
 doQueryResult dict query = map unoptimizeResult $ doQuery dict query ""
 
 doCrossword dict word = map unoptimizeResult $ doQuery dict (stringToQuery word) ""
+doCrosswordStraight dict word = map unoptimizeResult $ doQuery dict (stringToStraightQuery word) ""
