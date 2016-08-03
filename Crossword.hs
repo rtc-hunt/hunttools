@@ -1,21 +1,39 @@
-module Crossword (buildDict, stringToQuery, stringToStraightQuery, doCrossword, doCrosswordStraight, QueryPart (Literal, Glob, Dot ), CrosswordDictionary, buildDictAscSplit )
+{-# LANGUAGE Safe #-}
+module Crossword (
+  buildDict,
+  stringToCrosswordQuery,
+  stringToStraightCrosswordQuery,
+  crossword,
+  QueryPart (Literal, Glob, Dot, Charset, Star ),
+  CrosswordDictionary (BidirectionalDictionary, ForwardDictionary),
+  buildDictAscSplit,
+  buildDictUnidir,
+  doQuery,
+  getCrosswordDAWG
+  )
 where
 
-import Data.DAWG.Packed
+import Data.DAWG.Packed64
 import Data.List.Split
 import Data.List
 import Data.Maybe
 import Data.Ord
+import Data.Char
 import MergeDawg
 
-data QueryPart = Literal String | Glob | Dot | Charset [Char] deriving (Show)
-type CrosswordDictionary = Node
+data QueryPart = Literal String | Glob | Dot | Charset [Char] | Star QueryPart deriving (Show)
+data CrosswordDictionary = BidirectionalDictionary Node | ForwardDictionary Node
+
+getCrosswordDAWG (BidirectionalDictionary a) = a
+getCrosswordDAWG (ForwardDictionary a) = a
 
 rootedWords :: String -> [String]
 rootedWords w = let res = zipWith ((++) . (++"|")) (tails w) $ map reverse $ inits w in (foldl' (const id) "" res ::String) `seq` res
 
 buildDict :: [String] -> Node
 buildDict wordList = fromList $ let res=concatMap rootedWords wordList in foldl' (const id) "" res `seq` res
+
+buildDictUnidir wordList = fromAscList wordList
 
 buildDictAscSplit wordList = buildHugeDAWG $ wordList
 --	do wd <- wordList
@@ -38,6 +56,11 @@ doQuery dict (Glob:rest) aPrefix =
 	(doQuery dict rest aPrefix)
 	  ++ (do child <- children dict
 	         doQuery child (Glob:rest) $ aPrefix ++ [char child])
+doQuery dict (Star (Charset s):rest) aPrefix =
+	(doQuery dict rest aPrefix)
+          ++ (do char <- s
+	         node <- maybeToList $ lookupPrefix [char] dict
+		 doQuery node (Star (Charset s):rest) $ aPrefix++[char])
 
 findLongestLiterals q = snd $ maximumBy (comparing $ length.litString.fst) $ filter (isLiteral . fst) $ zip q [0..]
 	where litString (Literal a) = a
@@ -58,15 +81,16 @@ tokenToQueryPart '?' = Dot
 tokenToQueryPart '*' = Glob
 tokenToQueryPart a = Literal [a]
 
-stringToQuery word = optimizeInitialLiteral $ stringToStraightQuery word
+stringToCrosswordQuery word = optimizeInitialLiteral $ stringToStraightCrosswordQuery $ word ++ "|"
 
-stringToStraightQuery word = reverse $
+stringToStraightCrosswordQuery word = reverse $
 	foldl coalesceLiterals [] $
-		map tokenToQueryPart $ word ++ "|"
+		map tokenToQueryPart $ word
 
 unoptimizeResult r = let idx = fromJust $ elemIndex '|' r in (reverse $ drop (idx+1) r) ++ (take idx r)
 
 doQueryResult dict query = map unoptimizeResult $ doQuery dict query ""
 
-doCrossword dict word = map unoptimizeResult $ doQuery dict (stringToQuery word) ""
-doCrosswordStraight dict word = map unoptimizeResult $ doQuery dict (stringToStraightQuery word) ""
+crossword (BidirectionalDictionary dict) word = map unoptimizeResult $ doQuery dict (stringToCrosswordQuery $ map toLower word) ""
+crossword (ForwardDictionary dict) word = doQuery dict (stringToStraightCrosswordQuery $ map toLower word) ""
+

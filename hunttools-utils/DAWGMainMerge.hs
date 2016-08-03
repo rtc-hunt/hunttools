@@ -1,7 +1,7 @@
 module Main where
 import Crossword
 import System.Environment
-import Data.DAWG.Packed
+import Data.DAWG.Packed64
 import MergeDawg
 main = do
 	cliArgs <- getArgs
