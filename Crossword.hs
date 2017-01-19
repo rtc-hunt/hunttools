@@ -21,7 +21,7 @@ import Data.Ord
 import Data.Char
 import MergeDawg
 
-data QueryPart = Literal String | Glob | Dot | Charset [Char] | Star QueryPart deriving (Show)
+data QueryPart = Literal String | Glob | Dot | Charset [Char] | Star QueryPart | Opt String deriving (Show)
 data CrosswordDictionary = BidirectionalDictionary Node | ForwardDictionary Node
 
 getCrosswordDAWG (BidirectionalDictionary a) = a
@@ -61,6 +61,10 @@ doQuery dict (Star (Charset s):rest) aPrefix =
           ++ (do char <- s
 	         node <- maybeToList $ lookupPrefix [char] dict
 		 doQuery node (Star (Charset s):rest) $ aPrefix++[char])
+doQuery dict ((Opt str):rest) aPrefix =
+        (do node <- maybeToList $ lookupPrefix str dict
+            doQuery node rest $ aPrefix++str) ++ 
+        (doQuery dict rest aPrefix)
 
 findLongestLiterals q = snd $ maximumBy (comparing $ length.litString.fst) $ filter (isLiteral . fst) $ zip q [0..]
 	where litString (Literal a) = a
@@ -94,3 +98,5 @@ doQueryResult dict query = map unoptimizeResult $ doQuery dict query ""
 crossword (BidirectionalDictionary dict) word = map unoptimizeResult $ doQuery dict (stringToCrosswordQuery $ map toLower word) ""
 crossword (ForwardDictionary dict) word = doQuery dict (stringToStraightCrosswordQuery $ map toLower word) ""
 
+crosswordSubseq (BidirectionalDictionary dict) word = map unoptimizeResult $ doQuery dict (Literal "|":(map (Opt . (\a->[a]) . toLower) word)) ""
+crosswordSubseq (ForwardDictionary dict) word = doQuery dict (reverse $ map (Opt . (\a->[a]) . toLower) word) ""
