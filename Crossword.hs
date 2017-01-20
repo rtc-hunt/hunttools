@@ -1,4 +1,4 @@
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE Safe, FlexibleInstances #-}
 module Crossword (
   buildDict,
   stringToCrosswordQuery,
@@ -85,6 +85,20 @@ tokenToQueryPart '?' = Dot
 tokenToQueryPart '*' = Glob
 tokenToQueryPart a = Literal [a]
 
+class CrosswordQuery a where
+  finalizeQuery :: a -> [QueryPart]
+  finalizeQueryStraight :: a -> [QueryPart]
+
+instance CrosswordQuery [Char] where
+  finalizeQuery = stringToCrosswordQuery . (map toLower)
+  finalizeQueryStraight = stringToStraightCrosswordQuery . (map toLower)
+
+instance CrosswordQuery [QueryPart] where
+  finalizeQuery a = optimizeInitialLiteral $ finalizeQueryStraight $ if any isLiteralWithPipe a then a else a++[Literal "|"]
+        where isLiteralWithPipe (Literal str) = '|' `elem` str
+              isLiteralWithPipe _ = False
+  finalizeQueryStraight = foldl coalesceLiterals []
+
 stringToCrosswordQuery word = optimizeInitialLiteral $ stringToStraightCrosswordQuery $ word ++ "|"
 
 stringToStraightCrosswordQuery word = reverse $
@@ -95,8 +109,9 @@ unoptimizeResult r = let idx = fromJust $ elemIndex '|' r in (reverse $ drop (id
 
 doQueryResult dict query = map unoptimizeResult $ doQuery dict query ""
 
-crossword (BidirectionalDictionary dict) word = map unoptimizeResult $ doQuery dict (stringToCrosswordQuery $ map toLower word) ""
-crossword (ForwardDictionary dict) word = doQuery dict (stringToStraightCrosswordQuery $ map toLower word) ""
+crossword :: (CrosswordQuery a) => CrosswordDictionary -> a -> [String]
+crossword (BidirectionalDictionary dict) word = map unoptimizeResult $ doQuery dict (finalizeQuery word) ""
+crossword (ForwardDictionary dict) word = doQuery dict (finalizeQueryStraight word) ""
 
 crosswordSubseq (BidirectionalDictionary dict) word = map unoptimizeResult $ doQuery dict (Literal "|":(map (Opt . (\a->[a]) . toLower) word)) ""
 crosswordSubseq (ForwardDictionary dict) word = doQuery dict (reverse $ map (Opt . (\a->[a]) . toLower) word) ""
