@@ -4,6 +4,7 @@ module Crossword (
   stringToCrosswordQuery,
   stringToStraightCrosswordQuery,
   crossword,
+  crosswordSubseq,
   QueryPart (Literal, Glob, Dot, Charset, Star ),
   CrosswordDictionary (BidirectionalDictionary, ForwardDictionary),
   buildDictAscSplit,
