@@ -1,4 +1,4 @@
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE Safe, FlexibleInstances #-}
 {-|
  Module: Crossword
  Description: In-order regex-like dictionary searches.
@@ -17,6 +17,7 @@ module Crossword (
   stringToCrosswordQuery,
   stringToStraightCrosswordQuery,
   crossword,
+  crosswordSubseq,
   QueryPart (Literal, Glob, Dot, Charset, Star ),
   CrosswordDictionary (BidirectionalDictionary, ForwardDictionary),
   buildDictAscSplit,
@@ -44,7 +45,10 @@ data QueryPart =
   -- | Character sets; matches exactly one of any of the given characters. Not available from the string-to-query parser.
   | Charset [Char] 
   -- | Kleene star. Not available from the string-to-query parser.
-  | Star QueryPart deriving (Show)
+  | Star QueryPart 
+  -- | FIXME: what does this do again?
+  | Opt String
+  deriving (Show)
 
 -- | A crossword dictionary.
 data CrosswordDictionary = 
@@ -90,6 +94,10 @@ doQuery dict (Star (Charset s):rest) aPrefix =
           ++ (do char <- s
 	         node <- maybeToList $ lookupPrefix [char] dict
 		 doQuery node (Star (Charset s):rest) $ aPrefix++[char])
+doQuery dict ((Opt str):rest) aPrefix =
+        (do node <- maybeToList $ lookupPrefix str dict
+            doQuery node rest $ aPrefix++str) ++ 
+        (doQuery dict rest aPrefix)
 
 findLongestLiterals q = snd $ maximumBy (comparing $ length.litString.fst) $ filter (isLiteral . fst) $ zip q [0..]
 	where litString (Literal a) = a
@@ -110,6 +118,20 @@ tokenToQueryPart '?' = Dot
 tokenToQueryPart '*' = Glob
 tokenToQueryPart a = Literal [a]
 
+class CrosswordQuery a where
+  finalizeQuery :: a -> [QueryPart]
+  finalizeQueryStraight :: a -> [QueryPart]
+
+instance CrosswordQuery [Char] where
+  finalizeQuery = stringToCrosswordQuery . (map toLower)
+  finalizeQueryStraight = stringToStraightCrosswordQuery . (map toLower)
+
+instance CrosswordQuery [QueryPart] where
+  finalizeQuery a = optimizeInitialLiteral $ finalizeQueryStraight $ if any isLiteralWithPipe a then a else a++[Literal "|"]
+        where isLiteralWithPipe (Literal str) = '|' `elem` str
+              isLiteralWithPipe _ = False
+  finalizeQueryStraight = foldl coalesceLiterals []
+
 stringToCrosswordQuery word = optimizeInitialLiteral $ stringToStraightCrosswordQuery $ word ++ "|"
 
 stringToStraightCrosswordQuery word = reverse $
@@ -120,6 +142,9 @@ unoptimizeResult r = let idx = fromJust $ elemIndex '|' r in (reverse $ drop (id
 
 doQueryResult dict query = map unoptimizeResult $ doQuery dict query ""
 
-crossword (BidirectionalDictionary dict) word = map unoptimizeResult $ doQuery dict (stringToCrosswordQuery $ map toLower word) ""
-crossword (ForwardDictionary dict) word = doQuery dict (stringToStraightCrosswordQuery $ map toLower word) ""
+crossword :: (CrosswordQuery a) => CrosswordDictionary -> a -> [String]
+crossword (BidirectionalDictionary dict) word = map unoptimizeResult $ doQuery dict (finalizeQuery word) ""
+crossword (ForwardDictionary dict) word = doQuery dict (finalizeQueryStraight word) ""
 
+crosswordSubseq (BidirectionalDictionary dict) word = map unoptimizeResult $ doQuery dict (Literal "|":(map (Opt . (\a->[a]) . toLower) word)) ""
+crosswordSubseq (ForwardDictionary dict) word = doQuery dict (reverse $ map (Opt . (\a->[a]) . toLower) word) ""

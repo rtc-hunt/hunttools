@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-module MergeDawg (mergeDAWG, buildHugeDAWG, mergeDawgNew, mergeToHandle, mergeToHandleComp, mergeToVector) where
+module MergeDawg (mergeDAWG, buildHugeDAWG, mergeDawgNew, mergeToHandle, mergeToVector) where
 
 import Data.DAWG.Packed64
 import Data.Word
@@ -18,7 +18,6 @@ import System.IO
 import Control.Monad
 --import qualified Data.Vector.Unboxed.Mutable as VM
 import Data.IORef
-import qualified Data.Trie as T
 import qualified Crypto.Hash.SHA256 as SHA
 import qualified Data.Digest.CRC32 as CRC
 import Control.DeepSeq
@@ -163,23 +162,6 @@ mergeToVector roots = do
 	vv <- readIORef vec
 	fv <- GV.unsafeFreeze $ VM.slice 0 (count+1) vv :: IO (VS.Vector Word64)
 	return $ vecToNode $ GV.convert fv
-
-
-mergeToHandleComp handle roots = do
-	cursor <- newIORef (1::Int)
-	findMap <- newIORef (T.empty::T.Trie Int)
-	let writer as = do
-		crsr <- readIORef cursor
-		handleWriter handle as
-		modifyIORef cursor (length as+)
-		modifyIORef findMap (T.insert (LB.toStrict $ LB.concat $ map encode as) crsr)
-	let getDone as = do
-		tr <- readIORef findMap
-		return $ T.lookup (BS.concat $ map (LB.toStrict . encode) as) tr
-	(count, [root]) <- newcursiveMerge writer getDone (1, []) roots
-	writer [root `setBit` 1]
-	return ()
-
 
 --recursiveMerge :: String -> [Node] -> ([Word64], Int, [Word64]) -> ([Word64], Int, [Word64])
 recursiveMerge strCur (result, cnt, siblings) nodes =
