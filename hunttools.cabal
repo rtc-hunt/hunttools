@@ -4,7 +4,7 @@
 name:                hunttools
 version:             0.1.0.0
 -- synopsis:            
--- description:         
+description:         A collection of tools for doing mystery hunt puzzles.
 -- license:             
 license-file:        LICENSE
 author:              Jonathan D.K. Gibbons
@@ -20,7 +20,7 @@ library
   -- other-modules:       
   other-extensions:    OverloadedStrings
 --  build-depends:       base >=4.7 && <=4.8, bytestring-trie >=0.2 && <0.3, bytestring >=0.10 && <0.11, containers >=0.5 && <0.6, packed-dawg >=0.2 && <0.3, split >=0.2 && <0.3
-  build-depends:       base, bytestring-trie, bytestring, containers, packed-dawg, split, vector, binary, bytestring, cryptohash, digest, deepseq, vector-mmap, HTTP
+  build-depends:       base, bytestring-trie, bytestring, containers, packed-dawg-big, split, vector, binary, bytestring, cryptohash, digest, deepseq, vector-mmap, HTTP
   -- hs-source-dirs:      
   default-language:    Haskell2010
 

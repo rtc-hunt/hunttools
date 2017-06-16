@@ -1,4 +1,17 @@
 {-# LANGUAGE Safe #-}
+{-|
+ Module: Crossword
+ Description: In-order regex-like dictionary searches.
+
+ Core regex-like dictionary search; we implement a simple glob-like pattern, and nondeterministic retrieval from a trie structure to minimize cost.
+
+ * Examples
+ 
+ >>> crossword onelook "j???l??p??a?d"
+ ["jeanlucpicard", ...]
+
+-}
+
 module Crossword (
   buildDict,
   stringToCrosswordQuery,
@@ -21,8 +34,24 @@ import Data.Ord
 import Data.Char
 import MergeDawg
 
-data QueryPart = Literal String | Glob | Dot | Charset [Char] | Star QueryPart deriving (Show)
-data CrosswordDictionary = BidirectionalDictionary Node | ForwardDictionary Node
+data QueryPart = 
+  -- | A literal string of characters. This could equivalently be written with as a Literal Char type, but we chose to simplify the QueryPart level of the representation.
+  Literal String 
+  -- | Matches zero-or-more arbitrary characters. Notably, this is __not__ the kleene star; in regex terms it's .*. * is parsed to Glob.
+  | Glob 
+  -- | Exactly one arbitrary character. Named after regex dot, but we parse ? to it following shell and crossword-solver conventions.
+  | Dot 
+  -- | Character sets; matches exactly one of any of the given characters. Not available from the string-to-query parser.
+  | Charset [Char] 
+  -- | Kleene star. Not available from the string-to-query parser.
+  | Star QueryPart deriving (Show)
+
+-- | A crossword dictionary.
+data CrosswordDictionary = 
+  -- | A dictionary that has been munged to allow starting in the middle of the word; see 'optimizeInitialLiteral' in the source for details.
+  BidirectionalDictionary Node
+  -- | A dictionary that is a simple trie of the words in the dictionary.
+  | ForwardDictionary Node
 
 getCrosswordDAWG (BidirectionalDictionary a) = a
 getCrosswordDAWG (ForwardDictionary a) = a
