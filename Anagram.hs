@@ -3,15 +3,52 @@
 Module : Anagram
 Description : Dictionary structure and queries for anagrams.
 
-Core anagram toolkit. The main entry points are anagram, anagramAny, anagramMin, anagramFull, and anagramExact. Histograms are the internal form for anagram queries, and are a count of how many of each letter is present in the query.
+Core anagram toolkit. The main entry points are 'anagram', 'anagramAny', 'anagramMin', 'anagramFull', and 'anagramExact'. 'Histogram's are the internal form for anagram queries, and are a count of how many of each letter is present in the query.
 
-* Examples
+= Examples
 
 >>> anagram ukacd "eoynkm"
+["monkey", "mekon", "money", ... "yon"]
+>>> anagramAny ukacd "eoynkm"
+["monkey", "mekon", "money", ... "me", "mo", "my", ... "n", "o", "y"]
+>>> anagramFull ukacd "eoynkm"
 ["monkey"]
+>>> anagramMin ukacd "eoynkm" 5
+["monkey", "mekon", "money"]
+>>> anagramExact ukacd 5 "eoynkm"
+["mekon", "money"]
+>>> anagramFull ukacd "?eoynk"
+["donkey","monkey","orkney","unyoke","yonker"]
 
+We can also use the Histogram type directly, if that happens to be convenient:
+
+>>> Histogram 9 (replicate 26 1)
+histogramFromPairs 9 [('a',1),('b',1),('c',1),('d',1),('e',1),('f',1),('g',1),('h',1),('i',1),
+  ('j',1),('k',1),('l',1),('m',1),('n',1),('o',1),('p',1),('q',1),('r',1),('s',1),('t',1),
+  ('u',1),('v',1),('w',1),('x',1),('y',1),('z',1)]
+>>> anagramFull onelook (Histogram 9 (replicate 26 1))
+["thequickbrownfoxjumpsoverthelazydog"]
 -}
-module Anagram (anagram, buildAnagramDictionary, getHistogram, AnagramDictionary (AnagramDictionary), anagramAny, anagramMin, anagramFull, subHistogram, fromAnagramDictionary, anagramExact, Histogram (Histogram), seqAna) where
+module Anagram (
+        Anagrammable, 
+        -- * Main entry points
+        anagram, 
+        anagramAny, 
+        anagramFull, 
+        anagramMin, 
+        anagramExact, 
+        -- * Lower-level programmatic interface
+        Histogram (Histogram),
+        blankCount,
+        fromHistogram,
+        anagramSymbols,
+        getHistogram, 
+        subHistogram, 
+        -- * Dictionaries
+        AnagramDictionary (AnagramDictionary), 
+        buildAnagramDictionary, 
+        fromAnagramDictionary,
+        ) where
 
 import qualified Data.Map as M
 import Data.Maybe
@@ -21,13 +58,13 @@ import Data.List
 import Data.Ord
 
 -- | The list of symbols we support anagramming; anything not in this list is simply dropped. We use a finite list so 'Histogram' and 'AnagramDictionary' don't need to store actual characters.
-symbols = ['a'..'z']
+anagramSymbols = ['a'..'z']
 
 -- | The Histogram type; we implement anagram queries by converting the string to one of these, and querying the database for matches.
 data Histogram = Histogram {
   -- | We differentiate internally between real letters and wildcards; the underlying code has to deal with them fully differently.
   blankCount :: Int
-  -- | the list of counts; the order is the same order as 'symbols'.
+  -- | the list of counts; the order is the same order as 'anagramSymbols'.
   ,fromHistogram :: [Int]
   }
 
@@ -44,14 +81,16 @@ newtype AnagramDictionary = AnagramDictionary Node
 fromAnagramDictionary (AnagramDictionary trie) = trie
 
 instance Show Histogram where
-  show (Histogram blanks bs) = "histogramFromPairs " ++ (show blanks) ++ " " ++ (show $ zip symbols $ map fromEnum bs)
+  show (Histogram blanks bs) = "histogramFromPairs " ++ (show blanks) ++ " " ++ (show $ zip anagramSymbols $ map fromEnum bs)
 
 -- | Build a histogram manually from a number of blanks and a list of character, count pairs.
-histogramFromPairs k lst = Histogram k $ snd <$> (filter ((`elem` symbols) . fst) $ unionBy (\a b-> fst a == fst b) (sortBy (comparing fst) lst) $ zip symbols $ repeat 0 )
+histogramFromPairs k lst = Histogram k $ snd <$> (filter ((`elem` anagramSymbols) . fst) $ unionBy (\a b-> fst a == fst b) (sortBy (comparing fst) lst) $ zip anagramSymbols $ repeat 0 )
 
 -- | A typeclass for things that can be treated as anagram queries.
+--
+-- Currently, there is a 'String' instance (so you can use bare strings; also known as ['Char']) and a 'Histogram' instance, to allow lower-level access through the same functions.
 class (Anagrammable a) where
-  -- | Get the query in the form of a Histogram, to actually use as a query.
+  -- | Get the query in the form of a Histogram, to actually use to access an anagram dictionary.
   getHistogram :: a->Histogram
 
 instance (Anagrammable [Char]) where
@@ -59,13 +98,11 @@ instance (Anagrammable [Char]) where
   getHistogram str = 
     Histogram (length $ filter (=='?') str) $ let
        q=M.fromListWith (+) [(toLower c,1)|c<-str] 
-    in Prelude.map (\s -> M.findWithDefault 0 s q) symbols
+    in Prelude.map (\s -> M.findWithDefault 0 s q) anagramSymbols
 
 instance (Anagrammable Histogram) where
   -- | getHistogram = id when the type is already a Histogram.
   getHistogram hist = hist
-
---fromHistogram (Histogram _ h) = h
 
 -- | Subtract a histogram from a histogram. "aabc" - "ab" = "ac"
 subHistogram h r = 
@@ -103,13 +140,13 @@ queryAnagramDictionaryK trie mii hist =
 
 lookupHistogram trie hist = queryAnagramDictionary trie 0 hist
 
--- | Basic anagram. Constrains the set of returned anagrams to use half and all of the letters in the query.
+-- | Basic anagram. Constrains the set of returned anagrams to use between half and all of the letters in the query.
 anagram :: (Anagrammable a) => AnagramDictionary -> a -> [String]
 anagram dict str =
   queryAnagramDictionary (fromAnagramDictionary dict) ((charCount hist) `quot` 2) hist
   where hist = getHistogram str
 
--- | As above, but from all to none of the letters in the query.
+-- | As 'anagram', but from all to none of the letters in the query.
 anagramAny :: (Anagrammable a) => AnagramDictionary -> a -> [String]
 anagramAny dict str =
   queryAnagramDictionary (fromAnagramDictionary dict) (charCount hist) hist
@@ -117,11 +154,11 @@ anagramAny dict str =
 
 -- | Anagram at-least-k letters from the query.
 --
--- prop> anagram dict query = anagramMin dict query (length query `quot` 2)
+-- prop> anagram dict query = anagramMin dict (length query / 2) query
 --
--- prop> anagramAny dict query = anagramMin dict query 0
-anagramMin :: (Anagrammable a) => AnagramDictionary -> a -> Int -> [String]
-anagramMin dict str min =
+-- prop> anagramAny dict query = anagramMin dict 0 query 0
+anagramMin :: (Anagrammable a) => AnagramDictionary -> Int -> a -> [String]
+anagramMin dict min str =
   queryAnagramDictionary (fromAnagramDictionary dict) ((charCount hist)-min) hist
   where hist = getHistogram str
 

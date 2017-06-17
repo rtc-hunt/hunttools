@@ -2,6 +2,13 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances #-}
+
+{-|
+ Module: ConsumptiveMonad
+ Description: a monad for query-consuming operations, like multi-word anagrams or word deinterlacing.
+
+ FIXME: figure out how to teach how to use this.
+ -}
 module ConsumptiveMonad where 
 import ListT
 import Control.Monad.State

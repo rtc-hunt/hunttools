@@ -12,17 +12,20 @@
 
 -}
 
-module Crossword (
-  buildDict,
-  stringToCrosswordQuery,
-  stringToStraightCrosswordQuery,
+module Crossword ( 
+  CrosswordQuery,
+  --finalizeQuery,
+  --finalizeQueryStraight,
+  -- * Entry points
   crossword,
   crosswordSubseq,
-  QueryPart (Literal, Glob, Dot, Charset, Star ),
+  -- * Programmatic interface
+  QueryPart (Literal, Glob, Dot, Charset, Star, Opt ),
+  -- * Dictionaries
   CrosswordDictionary (BidirectionalDictionary, ForwardDictionary),
+  buildDict,
   buildDictAscSplit,
   buildDictUnidir,
-  doQuery,
   getCrosswordDAWG
   )
 where
@@ -118,6 +121,9 @@ tokenToQueryPart '?' = Dot
 tokenToQueryPart '*' = Glob
 tokenToQueryPart a = Literal [a]
 
+-- | A typeclass of types we can use as a crossword query.
+-- 
+-- finalizeQuery and finalizeQueryStraight are probably going to merge into a single getQueryParts function. The distinction now is that finalizeQuery produces a query appropriate for a 'BidirectionalDictionary', while finalizeQueryStraight produces a query appropriate for a 'ForwardDictionary'.
 class CrosswordQuery a where
   finalizeQuery :: a -> [QueryPart]
   finalizeQueryStraight :: a -> [QueryPart]
@@ -142,9 +148,12 @@ unoptimizeResult r = let idx = fromJust $ elemIndex '|' r in (reverse $ drop (id
 
 doQueryResult dict query = map unoptimizeResult $ doQuery dict query ""
 
+
+-- | Run the given query against a crossword dictionary. This is the primary entry point for this module.
 crossword :: (CrosswordQuery a) => CrosswordDictionary -> a -> [String]
 crossword (BidirectionalDictionary dict) word = map unoptimizeResult $ doQuery dict (finalizeQuery word) ""
 crossword (ForwardDictionary dict) word = doQuery dict (finalizeQueryStraight word) ""
 
+-- | Treat the input as a raw string, and query for subsequences of that string in the dictionary. Does not have metacharacters, and essentially wraps every letter in an individual 'Opt'.
 crosswordSubseq (BidirectionalDictionary dict) word = map unoptimizeResult $ doQuery dict (Literal "|":(map (Opt . (\a->[a]) . toLower) word)) ""
 crosswordSubseq (ForwardDictionary dict) word = doQuery dict (reverse $ map (Opt . (\a->[a]) . toLower) word) ""

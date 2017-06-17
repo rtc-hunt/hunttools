@@ -1,4 +1,8 @@
 {-# LANGUAGE Trustworthy #-}
+{-|
+ Module: MergeDawg
+ Description: Tools for building larger DAWGs for dictionaries. Mostly needed for handling onelook-sized data.
+ -}
 module MergeDawg (mergeDAWG, buildHugeDAWG, mergeDawgNew, mergeToHandle, mergeToVector) where
 
 import Data.DAWG.Packed64

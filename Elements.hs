@@ -1,6 +1,11 @@
+{-|
+ Module: Elements
+ Description: Basic chemical element information.
+ -}
 module Elements where 
 import qualified Data.Map as Map
 
+-- | Record for a particular element.
 data ElementData = ElementData { atomicNumber :: Int, symbol :: String, name :: String } deriving (Show, Read)
 
 numberToSymbolMap = Map.fromList $ (\q->(atomicNumber q, symbol q)) <$> elementData

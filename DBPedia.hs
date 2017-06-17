@@ -1,4 +1,9 @@
 {-# LANGUAGE Trustworthy #-}
+
+{-| 
+ Module: DBPedia
+ Description: SPARQL queries against DBPedia, a structured extract of Wikipedia.
+-}
 module DBPedia (runDBPedia, defaultDBPQuery)
 where
 import Network.HTTP
