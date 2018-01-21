@@ -1,6 +1,6 @@
 {-| 
  Module: Pipes
- Description: Infix reversed-composition operator. '$|' is analogous to shell pipes.
+ Description: Infix reversed-function-application operator. '$|' is analogous to shell pipes.
 -}
 module Pipe where
 

@@ -5,22 +5,37 @@
 
  Core regex-like dictionary search; we implement a simple glob-like pattern, and nondeterministic retrieval from a trie structure to minimize cost.
 
- * Examples
+ Using strings, we have two metacharacters available: "*" and "?".
+ 
+ * "*" refers to arbitrarily many (including zero) arbitrary characters; it functions like * in the shell. Worth note is that this is /not/ regex behavior, where it refers to arbitrarily many /of the pattern to it's left/.
+
+ * "?" refers to exactly one arbitrary character. This matches most shells' use of "?", and corresponds to regex "."
+
+ = Examples
  
  >>> crossword onelook "j???l??p??a?d"
  ["jeanlucpicard", ...]
 
+ >>> crossword onelook "je*lu?p*d"
+ ["jeanlucpicard"]
+
+ >>> crossword onelook [Charset "jh",Charset "ea",Charset "ar",Charset "nr",Charset "ly",Charset "up",Charset "co",Charset "pt",Charset "it",Charset "ce",Charset "ar", Star (Charset "dr")]
+ ["harrypotter", "jeanlucpicard"]
+
+ >>> sortBy (comparing $ negate . length) $ crosswordSubseq "jheaarnrlyupcoptitcearrd"
+ ["jeanlucpicard", ... "harrypotter", ...]
+ 
+ (Sorting just to get the longest results first.)
 -}
 
 module Crossword ( 
   CrosswordQuery,
-  --finalizeQuery,
-  --finalizeQueryStraight,
   -- * Entry points
   crossword,
   crosswordSubseq,
   -- * Programmatic interface
   QueryPart (Literal, Glob, Dot, Charset, Star, Opt ),
+  convertQuery,
   -- * Dictionaries
   CrosswordDictionary (BidirectionalDictionary, ForwardDictionary),
   buildDict,
@@ -41,15 +56,15 @@ import MergeDawg
 data QueryPart = 
   -- | A literal string of characters. This could equivalently be written with as a Literal Char type, but we chose to simplify the QueryPart level of the representation.
   Literal String 
-  -- | Matches zero-or-more arbitrary characters. Notably, this is __not__ the kleene star; in regex terms it's .*. * is parsed to Glob.
+  -- | Matches zero-or-more arbitrary characters. * is parsed to this term. Notably, this is __not__ the kleene star; it's the shell *, equivalent to regex ".*"
   | Glob 
-  -- | Exactly one arbitrary character. Named after regex dot, but we parse ? to it following shell and crossword-solver conventions.
+  -- | Exactly one arbitrary character. Named after regex dot, but we use ? for it following shell and crossword-solver conventions.
   | Dot 
-  -- | Character sets; matches exactly one of any of the given characters. Not available from the string-to-query parser.
+  -- | Character sets; matches exactly one of any of the given characters. Not available via 'convertQuery' applied to a String.
   | Charset [Char] 
-  -- | Kleene star. Not available from the string-to-query parser.
+  -- | Kleene star. Not available via 'convertQuery' applied to a String.
   | Star QueryPart 
-  -- | FIXME: what does this do again?
+  -- | Matches zero or one copies of the entirety of the given string. Not available via 'convertQuery' applied to a String.
   | Opt String
   deriving (Show)
 
@@ -113,6 +128,7 @@ reverseQuery q = map reverseLiterals $ reverse q
 
 optimizeInitialLiteral q = let idx = findLongestLiterals q in (drop idx q) ++ (reverseQuery $ take idx q)
 
+-- use with reverse . foldl coalesceLiterals []
 coalesceLiterals (Literal str1:acc) (Literal str2) = (Literal $ str1++str2):acc
 coalesceLiterals (Glob:acc) Glob = Glob:acc
 coalesceLiterals acc term = term:acc
@@ -121,39 +137,31 @@ tokenToQueryPart '?' = Dot
 tokenToQueryPart '*' = Glob
 tokenToQueryPart a = Literal [a]
 
--- | A typeclass of types we can use as a crossword query.
--- 
--- finalizeQuery and finalizeQueryStraight are probably going to merge into a single getQueryParts function. The distinction now is that finalizeQuery produces a query appropriate for a 'BidirectionalDictionary', while finalizeQueryStraight produces a query appropriate for a 'ForwardDictionary'.
+-- | A typeclass of things we can use as a crossword query.
 class CrosswordQuery a where
-  finalizeQuery :: a -> [QueryPart]
-  finalizeQueryStraight :: a -> [QueryPart]
+  -- | Convert an a to the native "list of QueryParts" format.
+  convertQuery :: a -> [QueryPart]
 
 instance CrosswordQuery [Char] where
-  finalizeQuery = stringToCrosswordQuery . (map toLower)
-  finalizeQueryStraight = stringToStraightCrosswordQuery . (map toLower)
+  convertQuery = reverse . foldl coalesceLiterals [] . map tokenToQueryPart
 
 instance CrosswordQuery [QueryPart] where
-  finalizeQuery a = optimizeInitialLiteral $ finalizeQueryStraight $ if any isLiteralWithPipe a then a else a++[Literal "|"]
-        where isLiteralWithPipe (Literal str) = '|' `elem` str
-              isLiteralWithPipe _ = False
-  finalizeQueryStraight = foldl coalesceLiterals []
+  convertQuery = id
 
-stringToCrosswordQuery word = optimizeInitialLiteral $ stringToStraightCrosswordQuery $ word ++ "|"
+toBidirect a = optimizeInitialLiteral $ reverse $ foldl coalesceLiterals [] $ if any isLiteralWithPipe a then a else a++[Literal "|"]
+  where isLiteralWithPipe (Literal str) = '|' `elem` str
+        isLiteralWithPipe _ = False
 
-stringToStraightCrosswordQuery word = reverse $
-	foldl coalesceLiterals [] $
-		map tokenToQueryPart $ word
-
-unoptimizeResult r = let idx = fromJust $ elemIndex '|' r in (reverse $ drop (idx+1) r) ++ (take idx r)
-
-doQueryResult dict query = map unoptimizeResult $ doQuery dict query ""
-
+fromBidirect r = let idx = fromJust $ elemIndex '|' r in (reverse $ drop (idx+1) r) ++ (take idx r)
 
 -- | Run the given query against a crossword dictionary. This is the primary entry point for this module.
 crossword :: (CrosswordQuery a) => CrosswordDictionary -> a -> [String]
-crossword (BidirectionalDictionary dict) word = map unoptimizeResult $ doQuery dict (finalizeQuery word) ""
-crossword (ForwardDictionary dict) word = doQuery dict (finalizeQueryStraight word) ""
 
--- | Treat the input as a raw string, and query for subsequences of that string in the dictionary. Does not have metacharacters, and essentially wraps every letter in an individual 'Opt'.
-crosswordSubseq (BidirectionalDictionary dict) word = map unoptimizeResult $ doQuery dict (Literal "|":(map (Opt . (\a->[a]) . toLower) word)) ""
-crosswordSubseq (ForwardDictionary dict) word = doQuery dict (reverse $ map (Opt . (\a->[a]) . toLower) word) ""
+crossword (BidirectionalDictionary dict) word = map fromBidirect $ flip (doQuery dict) "" $ toBidirect $ convertQuery word
+
+crossword (ForwardDictionary dict) word = flip (doQuery dict) "" $ convertQuery word
+
+-- | Treat the input as a raw string, and query for subsequences of that string in the dictionary. Does not have metacharacters, and wraps every letter in an individual 'Opt'.
+crosswordSubseq :: CrosswordDictionary -> String -> [String]
+crosswordSubseq (BidirectionalDictionary dict) word = map fromBidirect $ doQuery dict (Literal "|":(map (Opt . (\a->[a]) . toLower) $ reverse word)) ""
+crosswordSubseq (ForwardDictionary dict) word = doQuery dict (reverse $ map (Opt . (\a->[a]) . toLower) $ reverse word) ""
