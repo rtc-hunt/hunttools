@@ -33,9 +33,13 @@ module Crossword (
   -- * Entry points
   crossword,
   crosswordSubseq,
+  crosswordSuperseqN,
   -- * Programmatic interface
   QueryPart (Literal, Glob, Dot, Charset, Star, Opt ),
   convertQuery,
+  -- * Utilities
+  splitNTimes,
+  insertNCopies,
   -- * Dictionaries
   CrosswordDictionary (BidirectionalDictionary, ForwardDictionary),
   buildDict,
@@ -51,6 +55,7 @@ import Data.List
 import Data.Maybe
 import Data.Ord
 import Data.Char
+import Control.Monad.Loops
 import MergeDawg
 
 data QueryPart = 
@@ -135,7 +140,7 @@ coalesceLiterals acc term = term:acc
 
 tokenToQueryPart '?' = Dot
 tokenToQueryPart '*' = Glob
-tokenToQueryPart a = Literal [a]
+tokenToQueryPart a = Literal [toLower a]
 
 -- | A typeclass of things we can use as a crossword query.
 class CrosswordQuery a where
@@ -165,3 +170,15 @@ crossword (ForwardDictionary dict) word = flip (doQuery dict) "" $ convertQuery 
 crosswordSubseq :: CrosswordDictionary -> String -> [String]
 crosswordSubseq (BidirectionalDictionary dict) word = map fromBidirect $ doQuery dict (Literal "|":(map (Opt . (\a->[a]) . toLower) $ reverse word)) ""
 crosswordSubseq (ForwardDictionary dict) word = doQuery dict (reverse $ map (Opt . (\a->[a]) . toLower) $ reverse word) ""
+
+-- | Break a list into a list of lists of n possibly-empty spans such that all (==lst) $ concat (splitNTimes n lst) is true.
+splitNTimes n lst = unfoldrM zz (lst,n)
+        where zz (_,0) = [Nothing]
+              zz (lst,1) = [Just (lst,("",0))]
+              zz (lst,n) = [Just (a,(b,n-1))|k<-[0..length lst], let (a,b)=splitAt k lst]
+-- | Return a list of every possible insertion of n copies of c into lst.
+insertNCopies c n lst = intercalate c <$> splitNTimes (n+1) lst
+
+-- | Do a crossword lookup for the input with n unknowns interspersed.
+crosswordSuperseqN :: CrosswordDictionary -> Int -> String -> [String]
+crosswordSuperseqN dict n i = insertNCopies "?" n i >>= crossword dict
