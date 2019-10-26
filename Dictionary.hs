@@ -1,4 +1,4 @@
-{-# LANGUAGE Safe #-}
+-- {-# LANGUAGE Safe #-}
 {-# LANGUAGE FlexibleInstances, UndecidableInstances #-}
 {-|
  Module: Dictionary

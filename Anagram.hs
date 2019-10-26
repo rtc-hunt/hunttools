@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, FlexibleInstances, Safe #-}
+{-# LANGUAGE OverloadedStrings, FlexibleInstances #-} -- , Safe #-}
 {-|
 Module : Anagram
 Description : Dictionary structure and queries for anagrams.
@@ -50,12 +50,15 @@ module Anagram (
         fromAnagramDictionary,
         ) where
 
+import Control.Monad
 import qualified Data.Map as M
 import Data.Maybe
 import Data.DAWG.Packed64
 import Data.Char
 import Data.List
 import Data.Ord
+
+import Debug.Trace
 
 -- | The list of symbols we support anagramming; anything not in this list is simply dropped. We use a finite list so 'Histogram' and 'AnagramDictionary' don't need to store actual characters.
 anagramSymbols = ['a'..'z']
@@ -127,13 +130,15 @@ queryAnagramDictionary trie mi hist =
         clamp a = if a<0 then 0 else a
         decrem allowed used = allowed - (clamp used)
 
-queryAnagramDictionaryK trie mii hist = 
-  sort $ recQuery mii (blankCount hist) (fromHistogram hist) trie
-  where recQuery mini maxi ([]) tr = if mini>0 || maxi>0 then [] else (maybeToList $ lookupPrefix ['$'] tr) >>= toList
+queryAnagramDictionaryK trie k hist = 
+  recQuery (traceShowId k) (traceShowId (blankCount hist)) (fromHistogram hist) trie
+  where recQuery mini maxi ([]) tr = do
+          guard $ not $ mini>0 --   || maxi>0
+          (maybeToList $ lookupPrefix ['$'] tr) >>= toList
         recQuery mini maxi (a:r) tr = do
-          v<- [(clamp $ a-mini)..a+maxi]
+          v<- [0..min mini (a+maxi)]
           next <- maybeToList $ lookupPrefix [toEnum v] tr
-          recQuery (decrem mini (a-v)) (decrem maxi (v-a)) r next
+          recQuery (mini - v) (decrem maxi (v-a)) r next
         clamp a = if a<0 then 0 else a
         decrem allowed used = allowed - (clamp used)
 
@@ -173,7 +178,7 @@ anagramFull dict str = queryAnagramDictionary (fromAnagramDictionary dict) 0 his
 --
 -- prop> all (\a->length a == k) (anagramExact dict k query)
 anagramExact :: (Anagrammable a) => AnagramDictionary -> Int -> a -> [String]
-anagramExact dict k str = queryAnagramDictionaryK (fromAnagramDictionary dict) ((charCount hist) - k) $ hist
+anagramExact dict k str = queryAnagramDictionaryK (fromAnagramDictionary dict) k $ hist
   where hist = getHistogram str
 
 accblat :: AnagramDictionary -> [([String], Histogram)]->Int->[([String], Histogram)]

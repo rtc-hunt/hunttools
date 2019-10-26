@@ -53,9 +53,12 @@ import Data.DAWG.Packed64
 import Data.List.Split
 import Data.List
 import Data.Maybe
+import Data.Either
 import Data.Ord
 import Data.Char
 import Control.Monad.Loops
+import Text.Parsec hiding (char)
+import qualified Text.Parsec as P
 import MergeDawg
 
 data QueryPart = 
@@ -148,7 +151,21 @@ class CrosswordQuery a where
   convertQuery :: a -> [QueryPart]
 
 instance CrosswordQuery [Char] where
-  convertQuery = reverse . foldl coalesceLiterals [] . map tokenToQueryPart
+  convertQuery = fromRight (error "Query parser failed") . parse parser "INPUT" -- reverse . foldl coalesceLiterals [] . map tokenToQueryPart
+    where
+        letterTerm = between (P.char '(') (P.char ')') (many $ noneOf "*?()[]") <|> pure <$> noneOf "*?()[]"
+        charset = Charset <$> between (P.char '[') (P.char ']') (many $ noneOf "*?()[]")
+                  <|> P.char '/' *> namedCharset
+        namedCharset =   Charset "aeiouy" <$ P.char 'v'
+                     <|> Charset "bcdfghjklmnpqrstvwxz" <$ P.char 'c'
+        term 
+          =   Dot <$ P.oneOf ".?"
+          <|> Glob <$ P.char '*' 
+          <|> Opt <$> try (letterTerm <* string "<?>") 
+          <|> Star <$> try (charset <* P.char '*')
+          <|> charset
+          <|> Literal <$> letterTerm
+        parser = reverse . foldl coalesceLiterals [] <$> many term
 
 instance CrosswordQuery [QueryPart] where
   convertQuery = id
