@@ -95,44 +95,44 @@ buildDict wordList = fromList $ let res=concatMap rootedWords wordList in foldl'
 buildDictUnidir wordList = fromAscList wordList
 
 buildDictAscSplit wordList = buildHugeDAWG $ wordList
---	do wd <- wordList
---	   id $! rootedWords wd
+--        do wd <- wordList
+--           id $! rootedWords wd
 
 --concatMap rootedWords wordList
 
 doQuery dict [] aPrefix = if member "" dict then [aPrefix] else []
 doQuery dict (Literal qPrefix:rest) aPrefix =
-	do node <- maybeToList $ lookupPrefix qPrefix dict
-	   doQuery node rest $ aPrefix++qPrefix
+        do node <- maybeToList $ lookupPrefix qPrefix dict
+           doQuery node rest $ aPrefix++qPrefix
 doQuery dict (Charset qSet:rest) aPrefix =
-	do char <- qSet
-	   node <- maybeToList $ lookupPrefix [char] dict
-	   doQuery node rest $ aPrefix++[char]
+        do char <- qSet
+           node <- maybeToList $ lookupPrefix [char] dict
+           doQuery node rest $ aPrefix++[char]
 doQuery dict (Dot:rest) aPrefix =
-	do child <- children dict
-	   doQuery child rest $ aPrefix++[char child]
+        do child <- children dict
+           doQuery child rest $ aPrefix++[char child]
 doQuery dict (Glob:rest) aPrefix =
-	(doQuery dict rest aPrefix)
-	  ++ (do child <- children dict
-	         doQuery child (Glob:rest) $ aPrefix ++ [char child])
+        (doQuery dict rest aPrefix)
+          ++ (do child <- children dict
+                 doQuery child (Glob:rest) $ aPrefix ++ [char child])
 doQuery dict (Star (Charset s):rest) aPrefix =
-	(doQuery dict rest aPrefix)
+        (doQuery dict rest aPrefix)
           ++ (do char <- s
-	         node <- maybeToList $ lookupPrefix [char] dict
-		 doQuery node (Star (Charset s):rest) $ aPrefix++[char])
+                 node <- maybeToList $ lookupPrefix [char] dict
+                 doQuery node (Star (Charset s):rest) $ aPrefix++[char])
 doQuery dict ((Opt str):rest) aPrefix =
         (do node <- maybeToList $ lookupPrefix str dict
             doQuery node rest $ aPrefix++str) ++ 
         (doQuery dict rest aPrefix)
 
 findLongestLiterals q = snd $ maximumBy (comparing $ length.litString.fst) $ filter (isLiteral . fst) $ zip q [0..]
-	where litString (Literal a) = a
-	      isLiteral (Literal _) = True
-	      isLiteral _ = False
+        where litString (Literal a) = a
+              isLiteral (Literal _) = True
+              isLiteral _ = False
 
 reverseQuery q = map reverseLiterals $ reverse q
-	where reverseLiterals (Literal a) = Literal $ reverse a
-	      reverseLiterals q = q
+        where reverseLiterals (Literal a) = Literal $ reverse a
+              reverseLiterals q = q
 
 optimizeInitialLiteral q = let idx = findLongestLiterals q in (drop idx q) ++ (reverseQuery $ take idx q)
 

@@ -57,6 +57,7 @@ import Data.DAWG.Packed64
 import Data.Char
 import Data.List
 import Data.Ord
+import Numeric.Natural
 
 import Debug.Trace
 
@@ -68,13 +69,13 @@ data Histogram = Histogram {
   -- | We differentiate internally between real letters and wildcards; the underlying code has to deal with them fully differently.
   blankCount :: Int
   -- | the list of counts; the order is the same order as 'anagramSymbols'.
-  ,fromHistogram :: [Int]
+  ,fromHistogram :: [(Int, Int)]
   }
 
 -- | Encode a histogram's counts as a string of chars. /not/ a string of the letters to anagram.
-histogramToString (Histogram blanks bs) = map toEnum bs
+-- histogramToString (Histogram blanks bs) = map toEnum bs
 
-charCount (Histogram blanks hist) = blanks + (foldl ((+)::Int->Int->Int) 0 hist)
+charCount (Histogram blanks hist) = blanks + sum (snd <$> hist) -- (foldl ((+)::Int->Int->Int) 0 hist)
 
 -- | A dictionary structure for querying anagrams.
 -- 
@@ -84,10 +85,10 @@ newtype AnagramDictionary = AnagramDictionary Node
 fromAnagramDictionary (AnagramDictionary trie) = trie
 
 instance Show Histogram where
-  show (Histogram blanks bs) = "histogramFromPairs " ++ (show blanks) ++ " " ++ (show $ zip anagramSymbols $ map fromEnum bs)
+  show (Histogram blanks bs) = "histogramFromPairs " ++ (show blanks) ++ " " ++ (show $ zip anagramSymbols $ bs)
 
 -- | Build a histogram manually from a number of blanks and a list of character, count pairs.
-histogramFromPairs k lst = Histogram k $ snd <$> (filter ((`elem` anagramSymbols) . fst) $ unionBy (\a b-> fst a == fst b) (sortBy (comparing fst) lst) $ zip anagramSymbols $ repeat 0 )
+histogramFromPairs k lst = Histogram k $ snd <$> (filter ((`elem` anagramSymbols) . fst) $ unionBy (\a b-> fst a == fst b) (sortBy (comparing fst) lst) $ zip anagramSymbols $ repeat (0, 0) )
 
 -- | A typeclass for things that can be treated as anagram queries.
 --
@@ -101,7 +102,7 @@ instance (Anagrammable [Char]) where
   getHistogram str = 
     Histogram (length $ filter (=='?') str) $ let
        q=M.fromListWith (+) [(toLower c,1)|c<-str] 
-    in Prelude.map (\s -> M.findWithDefault 0 s q) anagramSymbols
+    in ((,) 0) <$> Prelude.map (\s -> M.findWithDefault 0 s q) anagramSymbols
 
 instance (Anagrammable Histogram) where
   -- | getHistogram = id when the type is already a Histogram.
@@ -109,22 +110,27 @@ instance (Anagrammable Histogram) where
 
 -- | Subtract a histogram from a histogram. "aabc" - "ab" = "ac"
 subHistogram h r = 
-    let consumedBlanks = sum $ zipWith (\a b->clamp $ a - b) (fromHistogram r) (fromHistogram h)
-     in Histogram (blankCount h-blankCount r-consumedBlanks) $ zipWith (-) (fromHistogram h) (fromHistogram r)
+    let consumedBlanks = sum $ zipWith (\a b->clamp $ a - b) (snd <$> fromHistogram r) (snd <$> fromHistogram h)
+     in Histogram (blankCount h-blankCount r-consumedBlanks) $ zipWith (\(a,b) (c,d) -> ((a-c), (b-d))) (fromHistogram h) (fromHistogram r)
   where clamp a = if a<0 then 0 else a
 
 -- | Construct an anagram dictionary from a raw list of strings. Gets very slow on large dictionaries, due to the time to construct the trie.
 buildAnagramDictionary bigStringList = 
   AnagramDictionary $
     fromList $
-      map (\a->(map toEnum $ fromHistogram $ getHistogram a)++"$"++a) bigStringList
+      map (\a->(map (toEnum . snd) $ fromHistogram $ getHistogram a)++"$"++a) bigStringList
 
+
+-- | Core query.
+-- queryAnagramDictionary
+--  :: AnagramDictionary
+--  -> Int
 queryAnagramDictionary trie mi hist = 
   do mii <- [0..mi]
      sort $ recQuery mii (blankCount hist) (fromHistogram hist) trie
   where recQuery mini maxi ([]) tr = if mini>0 || maxi>0 then [] else (maybeToList $ lookupPrefix ['$'] tr) >>= toList
-        recQuery mini maxi (a:r) tr = do
-          v<- [(clamp $ a-mini)..a+maxi]
+        recQuery mini maxi ((lba,a):r) tr = do
+          v<- [(clamp $ max (a-mini) lba)..a+maxi]
           next <- maybeToList $ lookupPrefix [toEnum v] tr
           recQuery (decrem mini (a-v)) (decrem maxi (v-a)) r next
         clamp a = if a<0 then 0 else a
@@ -135,8 +141,8 @@ queryAnagramDictionaryK trie k hist =
   where recQuery mini maxi ([]) tr = do
           guard $ not $ mini>0 --   || maxi>0
           (maybeToList $ lookupPrefix ['$'] tr) >>= toList
-        recQuery mini maxi (a:r) tr = do
-          v<- [0..min mini (a+maxi)]
+        recQuery mini maxi ((lba,a):r) tr = do
+          v<- [lba .. min mini (a+maxi)]
           next <- maybeToList $ lookupPrefix [toEnum v] tr
           recQuery (mini - v) (decrem maxi (v-a)) r next
         clamp a = if a<0 then 0 else a
