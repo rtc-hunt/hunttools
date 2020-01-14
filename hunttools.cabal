@@ -15,17 +15,40 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     Anagram, Crossword, Dictionary, MergeDawg, Cipher, DBPedia, Pipe, AnswerChecker, Scrabble, Fancy
+  exposed-modules:     Anagram, Crossword, Dictionary, Cipher, Pipe, Scrabble, Fancy
             --           Braille, 
                        Elements,
                        --Sheets, 
                        ConsumptiveMonad
+  if !impl(ghcjs -any)
+    exposed-modules: AnswerChecker, DBPedia, MergeDawg
   -- other-modules:       
   other-extensions:    OverloadedStrings
 --  build-depends:       base >=4.7 && <=4.8, bytestring-trie >=0.2 && <0.3, bytestring >=0.10 && <0.11, containers >=0.5 && <0.6, packed-dawg >=0.2 && <0.3, split >=0.2 && <0.3
-  build-depends:       base, bytestring, containers, packed-dawg-big, split, vector, binary, cryptohash, digest, deepseq, vector-mmap, HTTP, regex-tdfa, wreq, lens, list-t, mtl, monad-loops, aeson, parsec
+  build-depends:       base
+        ,  bytestring
+        ,  containers
+        ,  packed-dawg-big
+        ,  split
+        ,  vector
+        ,  vector-mmap
+        ,  binary
+        ,  deepseq
+        ,  regex-tdfa
+      
+        ,  lens
+        ,  list-t
+        ,  mtl
+        ,  monad-loops
+        ,  aeson
+        ,  parsec
             --           , bitwise
   --, bitwise, gogol, gogol-sheets
   -- hs-source-dirs:      
+  if !impl(ghcjs -any)
+    build-depends: wreq
+        , HTTP
+        , cryptohash
+        , digest
   default-language:    Haskell2010
 

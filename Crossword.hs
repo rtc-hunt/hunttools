@@ -43,7 +43,7 @@ module Crossword (
   -- * Dictionaries
   CrosswordDictionary (BidirectionalDictionary, ForwardDictionary),
   buildDict,
-  buildDictAscSplit,
+  -- buildDictAscSplit,
   buildDictUnidir,
   getCrosswordDAWG
   )
@@ -59,7 +59,7 @@ import Data.Char
 import Control.Monad.Loops
 import Text.Parsec hiding (char)
 import qualified Text.Parsec as P
-import MergeDawg
+-- import MergeDawg
 
 data QueryPart = 
   -- | A literal string of characters. This could equivalently be written with as a Literal Char type, but we chose to simplify the QueryPart level of the representation.
@@ -94,7 +94,7 @@ buildDict wordList = fromList $ let res=concatMap rootedWords wordList in foldl'
 
 buildDictUnidir wordList = fromAscList wordList
 
-buildDictAscSplit wordList = buildHugeDAWG $ wordList
+-- buildDictAscSplit wordList = buildHugeDAWG $ wordList
 --        do wd <- wordList
 --           id $! rootedWords wd
 
