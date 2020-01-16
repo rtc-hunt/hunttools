@@ -154,7 +154,7 @@ instance CrosswordQuery [Char] where
   convertQuery = fromRight (error "Query parser failed") . parse parser "INPUT" -- reverse . foldl coalesceLiterals [] . map tokenToQueryPart
     where
         letterTerm = between (P.char '(') (P.char ')') (many $ noneOf "*?()[]") <|> pure <$> noneOf "*?()[]"
-        charset = Charset <$> between (P.char '[') (P.char ']') (many $ noneOf "*?()[]")
+        charset = Charset . fmap toLower <$> between (P.char '[') (P.char ']') (many $ noneOf "*?()[]")
                   <|> P.char '/' *> namedCharset
         namedCharset =   Charset "aeiouy" <$ P.char 'v'
                      <|> Charset "bcdfghjklmnpqrstvwxz" <$ P.char 'c'
@@ -164,7 +164,7 @@ instance CrosswordQuery [Char] where
           <|> Opt <$> try (letterTerm <* string "<?>") 
           <|> Star <$> try (charset <* P.char '*')
           <|> charset
-          <|> Literal <$> letterTerm
+          <|> Literal . fmap toLower <$> letterTerm
         parser = reverse . foldl coalesceLiterals [] <$> many term
 
 instance CrosswordQuery [QueryPart] where
