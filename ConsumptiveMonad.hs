@@ -74,10 +74,11 @@ instance IsQuery Histogram where
   toQuery = getHistogram
 
 -- Enables transparent get & put.
-instance (MonadState s m) => MonadState s (ListT m) where
+{- instance (MonadState s m) => MonadState s (ListT m) where
         get = lift get
         put = lift . put
         state = lift . state
+-}
 
 -- | Wrap a q -> [String] function to operate in the QConsumer monad.
 consumer :: IsQuery q => (q->[String])->QConsumer q String
