@@ -89,5 +89,5 @@ consumer f = do
         put specRemainder
         return res
 
-instance (Show a, IsQuery s) => Show (QConsumer s a) where
-        show = show . runQC (toQuery "DEFAULT QUERY")
+{- instance (Show a, IsQuery s) => Show (QConsumer s a) where
+        show = show . runQC (toQuery "DEFAULT QUERY") -}
