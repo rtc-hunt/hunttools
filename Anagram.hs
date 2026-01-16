@@ -137,7 +137,7 @@ queryAnagramDictionary trie mi hist =
         decrem allowed used = allowed - (clamp used)
 
 queryAnagramDictionaryK trie k hist = 
-  recQuery (traceShowId k) (traceShowId (blankCount hist)) (fromHistogram hist) trie
+  recQuery k (blankCount hist) (fromHistogram hist) trie
   where recQuery mini maxi ([]) tr = do
           guard $ not $ mini>0 --   || maxi>0
           (maybeToList $ lookupPrefix ['$'] tr) >>= toList
