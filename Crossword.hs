@@ -94,8 +94,8 @@ buildDict wordList = fromList $ let res=concatMap rootedWords wordList in foldl'
 
 buildDictUnidir wordList = fromAscList wordList
 
--- buildDictAscSplit wordList = buildHugeDAWG $ wordList
---        do wd <- wordList
+--buildDictAscSplit wordList = buildHugeDAWG $ wordList $ do
+--           wd <- wordList
 --           id $! rootedWords wd
 
 --concatMap rootedWords wordList

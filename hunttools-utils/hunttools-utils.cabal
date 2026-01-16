@@ -48,12 +48,12 @@ executable hugeDawgMerge
   ghc-options: -rtsopts -threaded -O2 -fprof-auto
   default-language: Haskell2010
 
-executable buildDawgAsc
-  Main-Is: DAWGMainAsc.hs
---  Other-Modules: Crossword, MergeDawg, Anagram
-  build-depends:  packed-dawg-big, split, base, vector, binary, bytestring, bytestring-trie, cryptohash, digest, deepseq, vector-mmap, hunttools
-  ghc-options: -rtsopts -threaded -O2 -fprof-auto
-  default-language: Haskell2010
+--executable buildDawgAsc
+--  Main-Is: DAWGMainAsc.hs
+----  Other-Modules: Crossword, MergeDawg, Anagram
+--  build-depends:  packed-dawg-big, split, base, vector, binary, bytestring, bytestring-trie, cryptohash, digest, deepseq, vector-mmap, hunttools
+--  ghc-options: -rtsopts -threaded -O2 -fprof-auto
+--  default-language: Haskell2010
 
 executable dawgMerge
   Main-Is: DAWGMainMerge.hs
